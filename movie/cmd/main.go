@@ -1,27 +1,59 @@
 package main
 
 import (
+	"context"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/high-la/movieapp/movie/internal/controller/movie"
-	metadataGateway "github.com/high-la/movieapp/movie/internal/gateway/metadata/http"
-	ratingGateway "github.com/high-la/movieapp/movie/internal/gateway/rating/http"
+	metadatagateway "github.com/high-la/movieapp/movie/internal/gateway/metadata/http"
+	ratinggateway "github.com/high-la/movieapp/movie/internal/gateway/rating/http"
 	httphandler "github.com/high-la/movieapp/movie/internal/handler/http"
+	"github.com/high-la/movieapp/pkg/discovery"
+	"github.com/high-la/movieapp/pkg/discovery/consul"
 )
+
+const serviceName = "movie"
 
 func main() {
 
-	log.Println("Starting the movie service")
+	var port int
+	flag.IntVar(&port, "port", 8083, "API handler port")
+	flag.Parse()
+	log.Printf("Starting the movie service on port %d", port)
 
-	metadataGateway := metadataGateway.New("localhost:8081")
-	ratingGateway := ratingGateway.New("localhost:8082")
+	registry, err := consul.NewRegistry("localhost:8500")
+	if err != nil {
+		panic(err)
+	}
 
+	ctx := context.Background()
+	instanceID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanceID, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			if err := registry.ReportHealthyState(instanceID, serviceName); err != nil {
+				log.Println("Failed to report healthy state: " + err.Error())
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	defer registry.Deregister(ctx, instanceID, serviceName)
+
+	metadataGateway := metadatagateway.New(registry)
+	ratingGateway := ratinggateway.New(registry)
 	ctrl := movie.New(ratingGateway, metadataGateway)
 	h := httphandler.New(ctrl)
 
 	http.Handle("/movie", http.HandlerFunc(h.GetMovieDetails))
-	if err := http.ListenAndServe(":8083", nil); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
 		panic(err)
 	}
 }
