@@ -5,14 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"time"
 
+	"github.com/high-la/movieapp/gen"
 	"github.com/high-la/movieapp/metadata/internal/controller/metadata"
-	httphandler "github.com/high-la/movieapp/metadata/internal/handler/http"
+	grpchandler "github.com/high-la/movieapp/metadata/internal/handler/grpc"
 	"github.com/high-la/movieapp/metadata/internal/repository/memory"
 	"github.com/high-la/movieapp/pkg/discovery"
 	"github.com/high-la/movieapp/pkg/discovery/consul"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 const serviceName = "metadata"
@@ -23,18 +26,15 @@ func main() {
 	flag.IntVar(&port, "port", 8081, "API handler port")
 	flag.Parse()
 	log.Printf("Starting the metadata service on port %d", port)
-
 	registry, err := consul.NewRegistry("localhost:8500")
 	if err != nil {
 		panic(err)
 	}
-
 	ctx := context.Background()
 	instanceID := discovery.GenerateInstanceID(serviceName)
 	if err := registry.Register(ctx, instanceID, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
 		panic(err)
 	}
-
 	go func() {
 		for {
 			if err := registry.ReportHealthyState(instanceID, serviceName); err != nil {
@@ -45,12 +45,17 @@ func main() {
 	}()
 
 	defer registry.Deregister(ctx, instanceID, serviceName)
-
 	repo := memory.New()
 	ctrl := metadata.New(repo)
-	h := httphandler.New(ctrl)
-	http.Handle("/metadata", http.HandlerFunc(h.GetMetadata))
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+	h := grpchandler.New(ctrl)
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%v", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	srv := grpc.NewServer()
+	reflection.Register(srv)
+	gen.RegisterMetadataServiceServer(srv, h)
+	if err := srv.Serve(lis); err != nil {
 		panic(err)
 	}
 }
