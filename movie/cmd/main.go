@@ -5,37 +5,37 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"time"
 
+	"github.com/high-la/movieapp/gen"
 	"github.com/high-la/movieapp/movie/internal/controller/movie"
 	metadatagateway "github.com/high-la/movieapp/movie/internal/gateway/metadata/http"
 	ratinggateway "github.com/high-la/movieapp/movie/internal/gateway/rating/http"
-	httphandler "github.com/high-la/movieapp/movie/internal/handler/http"
+	grpchandler "github.com/high-la/movieapp/movie/internal/handler/grpc"
+
 	"github.com/high-la/movieapp/pkg/discovery"
 	"github.com/high-la/movieapp/pkg/discovery/consul"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 const serviceName = "movie"
 
 func main() {
-
 	var port int
 	flag.IntVar(&port, "port", 8083, "API handler port")
 	flag.Parse()
 	log.Printf("Starting the movie service on port %d", port)
-
 	registry, err := consul.NewRegistry("localhost:8500")
 	if err != nil {
 		panic(err)
 	}
-
 	ctx := context.Background()
 	instanceID := discovery.GenerateInstanceID(serviceName)
 	if err := registry.Register(ctx, instanceID, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
 		panic(err)
 	}
-
 	go func() {
 		for {
 			if err := registry.ReportHealthyState(instanceID, serviceName); err != nil {
@@ -44,16 +44,19 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}()
-
 	defer registry.Deregister(ctx, instanceID, serviceName)
-
 	metadataGateway := metadatagateway.New(registry)
 	ratingGateway := ratinggateway.New(registry)
 	ctrl := movie.New(ratingGateway, metadataGateway)
-	h := httphandler.New(ctrl)
-
-	http.Handle("/movie", http.HandlerFunc(h.GetMovieDetails))
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+	h := grpchandler.New(ctrl)
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	srv := grpc.NewServer()
+	reflection.Register(srv)
+	gen.RegisterMovieServiceServer(srv, h)
+	if err := srv.Serve(lis); err != nil {
 		panic(err)
 	}
 }
