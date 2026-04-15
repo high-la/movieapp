@@ -4,6 +4,7 @@ go 1.25.8
 
 require (
 	github.com/armon/go-metrics v0.4.1 // indirect
+	github.com/confluentinc/confluent-kafka-go v1.9.2 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/hashicorp/consul/api v1.33.7 // indirect
