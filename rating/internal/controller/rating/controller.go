@@ -3,6 +3,7 @@ package rating
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/high-la/movieapp/rating/internal/repository"
 	"github.com/high-la/movieapp/rating/pkg/model"
@@ -17,14 +18,20 @@ type ratingRepository interface {
 	Put(ctx context.Context, recordID model.RecordID, recordType model.RecordType, rating *model.Rating) error
 }
 
+type ratingIngester interface {
+	Ingest(ctx context.Context) (chan model.RatingEvent, error)
+}
+
 // Controller defines a rating service controller.
 type Controller struct {
-	repo ratingRepository
+	repo     ratingRepository
+	ingester ratingIngester
 }
 
 // New create a rating service controller.
-func New(repo ratingRepository) *Controller {
-	return &Controller{repo}
+func New(repo ratingRepository, ingester ratingIngester) *Controller {
+
+	return &Controller{repo, ingester}
 }
 
 // GetAggregatedRating returns the aggregated rating for
@@ -51,4 +58,19 @@ func (c *Controller) GetAggregatedRating(ctx context.Context, recordID model.Rec
 func (c *Controller) PutRating(ctx context.Context, recordID model.RecordID, recordType model.RecordType, rating *model.Rating) error {
 
 	return c.repo.Put(ctx, recordID, recordType, rating)
+}
+
+// StartIngestion starts the ingestion of rating events.
+func (s *Controller) StartIngestion(ctx context.Context) error {
+	ch, err := s.ingester.Ingest(ctx)
+	if err != nil {
+		return err
+	}
+	for e := range ch {
+		fmt.Printf("Consumed a message: %v\n", e)
+		if err := s.PutRating(ctx, model.RecordID(e.RecordID), model.RecordType(e.RecordType), &model.Rating{UserID: e.UserID, Value: e.Value}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
