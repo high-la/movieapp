@@ -40,3 +40,10 @@ func (r *Repository) Get(ctx context.Context, id string) (*model.Metadata, error
 		Director:    director,
 	}, nil
 }
+
+// Put adds movie metadata for a given movie id.
+func (r *Repository) Put(ctx context.Context, id string, metadata *model.Metadata) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO movies (id, title, description, director) VALUES (?, ?, ?, ?)",
+		id, metadata.Title, metadata.Description, metadata.Director)
+	return err
+}
