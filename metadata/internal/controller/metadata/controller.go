@@ -15,6 +15,7 @@ var ErrNotFound = errors.New("note found")
 // Any type that implements Get(ctx, id) will satisfy this interface implicitly (no explicit declaration needed).
 type metadataRepository interface {
 	Get(ctx context.Context, id string) (*model.Metadata, error)
+	Put(ctx context.Context, id string, metadata *model.Metadata) error
 }
 
 // Controller defines a metadata service controller.
