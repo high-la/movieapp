@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/high-la/movieapp/rating/pkg/model"
 )
 
@@ -14,7 +15,7 @@ type Repository struct {
 
 // New creates a new MySQL-based rating repository.
 func New() (*Repository, error) {
-	db, err := sql.Open("mysql", "root:1234@/movieexample")
+	db, err := sql.Open("mysql", "root:1234@tcp(localhost:3406)/movieexample")
 	if err != nil {
 		return nil, err
 	}

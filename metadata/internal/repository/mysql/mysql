@@ -16,7 +16,7 @@ type Repository struct {
 
 // New creates a new MySQL-based repository.
 func New() (*Repository, error) {
-	db, err := sql.Open("mysql", "root:1234@/movieexample")
+	db, err := sql.Open("mysql", "root:1234@tcp(localhost:3406)/movieexample")
 	if err != nil {
 		return nil, err
 	}
