@@ -5,8 +5,8 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-	// "movieexample.com/metadata/internal/repository"
-	// "movieexample.com/metadata/pkg/model"
+	"github.com/high-la/movieapp/metadata/internal/repository"
+	"github.com/high-la/movieapp/metadata/pkg/model"
 )
 
 // Repository defines a MySQL-based movie matadata repository.

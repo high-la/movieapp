@@ -12,6 +12,7 @@ import (
 	"github.com/high-la/movieapp/metadata/internal/controller/metadata"
 	grpchandler "github.com/high-la/movieapp/metadata/internal/handler/grpc"
 	"github.com/high-la/movieapp/metadata/internal/repository/memory"
+	"github.com/high-la/movieapp/metadata/internal/repository/mysql"
 	"github.com/high-la/movieapp/pkg/discovery"
 	"github.com/high-la/movieapp/pkg/discovery/consul"
 	"google.golang.org/grpc"
@@ -21,7 +22,6 @@ import (
 const serviceName = "metadata"
 
 func main() {
-
 	var port int
 	flag.IntVar(&port, "port", 8081, "API handler port")
 	flag.Parse()
@@ -43,10 +43,13 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}()
-
 	defer registry.Deregister(ctx, instanceID, serviceName)
-	repo := memory.New()
-	ctrl := metadata.New(repo)
+	repo, err := mysql.New()
+	if err != nil {
+		panic(err)
+	}
+	cache := memory.New()
+	ctrl := metadata.New(repo, cache)
 	h := grpchandler.New(ctrl)
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%v", port))
 	if err != nil {
