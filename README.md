@@ -1,3 +1,3 @@
-# movie rating microservice project
+# Movie Rating system with microservice architecture
 
-on process of development
+This project is currently under active development.
