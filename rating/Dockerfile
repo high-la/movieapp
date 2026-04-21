@@ -3,7 +3,7 @@ FROM alpine:latest
 # Create and set working directory
 WORKDIR /app
 # Copy our binary and configs to the container
-COPY main ./
+COPY bin/main ./
 COPY configs/default.yaml ./
 # Make sure the binary is executable
 RUN chmod +x ./main
