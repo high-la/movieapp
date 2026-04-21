@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/high-la/movieapp/gen"
@@ -13,6 +13,7 @@ import (
 	metadatagateway "github.com/high-la/movieapp/movie/internal/gateway/metadata/http"
 	ratinggateway "github.com/high-la/movieapp/movie/internal/gateway/rating/http"
 	grpchandler "github.com/high-la/movieapp/movie/internal/handler/grpc"
+	"gopkg.in/yaml.v3"
 
 	"github.com/high-la/movieapp/pkg/discovery"
 	"github.com/high-la/movieapp/pkg/discovery/consul"
@@ -23,14 +24,21 @@ import (
 const serviceName = "movie"
 
 func main() {
-	var port int
-	flag.IntVar(&port, "port", 8083, "API handler port")
-	flag.Parse()
-	log.Printf("Starting the movie service on port %d", port)
-	registry, err := consul.NewRegistry("localhost:8500")
+	f, err := os.Open("default.yaml")
 	if err != nil {
 		panic(err)
 	}
+	var cfg config
+	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+		panic(err)
+	}
+	port := cfg.API.Port
+	log.Printf("Starting the movie service on port %d", port)
+	registry, err := consul.NewRegistry(cfg.ServiceDiscovery.Consul.Address)
+	if err != nil {
+		panic(err)
+	}
+
 	ctx := context.Background()
 	instanceID := discovery.GenerateInstanceID(serviceName)
 	if err := registry.Register(ctx, instanceID, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
